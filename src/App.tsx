@@ -1,21 +1,44 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import './App.css'; // Make sure you have this file with the keyframes animation
 
 // --- CONFIGURATION ---
 const SUITS = ['♥', '♦', '♣', '♠'];
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-const RANK_VALUES = {
+const RANK_VALUES: { [key: string]: number } = {
   '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
   'J': 11, 'Q': 12, 'K': 13, 'A': 14
 };
 
+interface CardType {
+  rank: string;
+  suit: string;
+  color: string;
+  isJoker: boolean;
+}
+
+interface TaskParams {
+  count?: number | number[];
+  royalRanks?: string[];
+  sum?: number | number[];
+  rank?: string | string[];
+  blackSuits?: string[];
+  [key: string]: any;
+}
+
+interface TaskTemplate {
+  template: string;
+  params?: TaskParams;
+  check: (hand: CardType[], params?: any) => boolean;
+}
+
 // --- DYNAMIC TASK GENERATION ---
 
 // Task templates with placeholders that will be filled dynamically
-const TASK_TEMPLATES = [
+const TASK_TEMPLATES: TaskTemplate[] = [
   {
     template: "Find a Pair of Even Ranks",
-    check: (hand) => {
+    check: (hand: CardType[]) => {
       const evenRanks = RANKS.filter(rank => RANK_VALUES[rank] % 2 === 0);
       return hand.some(card => card.isJoker === false && evenRanks.includes(card.rank)) &&
              hand.filter(card => card.isJoker === false && evenRanks.includes(card.rank)).length >= 2;
@@ -24,20 +47,20 @@ const TASK_TEMPLATES = [
   {
     template: "Find exactly {{count}} Heart cards",
     params: { count: [3] },
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       return hand.filter(card => card.suit === '♥').length === params.count;
     }
   },
   {
     template: "Find a Joker",
-    check: (hand) => {
+    check: (hand: CardType[]) => {
       return hand.some(card => card.isJoker);
     }
   },
   {
     template: "Find a Royal Pair ({{royalRanks}})",
     params: { royalRanks: ['J', 'Q', 'K', 'A'] },
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       const royalCards = hand.filter(card => card.isJoker === false && params.royalRanks.includes(card.rank));
       return royalCards.length >= 2;
     }
@@ -45,7 +68,7 @@ const TASK_TEMPLATES = [
   {
     template: "Find two cards that add up to {{sum}}",
     params: { sum: [10, 12, 15, 16] }, // Example sums
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       const cardsWithValue = hand.filter(card => card.isJoker === false);
       for (let i = 0; i < cardsWithValue.length; i++) {
         for (let j = i + 1; j < cardsWithValue.length; j++) {
@@ -60,40 +83,40 @@ const TASK_TEMPLATES = [
   {
     template: "Find a Flush ({{count}} cards of the same suit)",
     params: { count: [3, 4] },
-    check: (hand, params) => {
-      const suitCounts = {};
+    check: (hand: CardType[], params: any) => {
+      const suitCounts: { [key: string]: number } = {};
       for (const card of hand) {
         if (card.isJoker === false) {
           suitCounts[card.suit] = (suitCounts[card.suit] || 0) + 1;
         }
       }
-      return Object.values(suitCounts).some(count => count >= params.count);
+      return Object.values(suitCounts).some((count: any) => count >= params.count);
     }
   },
   {
     template: "Find a pair of {{rank}}s",
     params: { rank: RANKS.filter(r => r !== 'Joker' && r !== 'A' && r !== 'K' && r !== 'Q') }, // Exclude face cards and Jokers for "pair" tasks
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       return hand.filter(card => card.rank === params.rank).length >= 2;
     }
   },
   {
     template: "Find a Black Jack (a Jack of {{blackSuits}})",
     params: { blackSuits: ['♣', '♠'] },
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       return hand.some(card => card.rank === 'J' && params.blackSuits.includes(card.suit));
     }
   },
   {
     template: "Find a Red Queen",
-    check: (hand) => {
+    check: (hand: CardType[]) => {
       return hand.some(card => card.rank === 'Q' && (card.suit === '♥' || card.suit === '♦'));
     }
   },
   {
     template: "Find {{count}} Odd numbered cards",
     params: { count: [3] },
-    check: (hand, params) => {
+    check: (hand: CardType[], params: any) => {
       const oddRanks = RANKS.filter(rank => RANK_VALUES[rank] % 2 !== 0);
       return hand.filter(card => card.isJoker === false && oddRanks.includes(card.rank)).length >= params.count;
     }
@@ -104,13 +127,13 @@ const TASK_TEMPLATES = [
 ];
 
 function App() {
-  const [hand, setHand] = useState([]);
-  const [currentTask, setCurrentTask] = useState({ text: "Click 'New Mission' to start!", checkFn: () => false, params: {} });
+  const [hand, setHand] = useState<CardType[]>([]);
+  const [currentTask, setCurrentTask] = useState<{ text: string, checkFn: (hand: CardType[], params?: any) => boolean, params: any }>({ text: "Click 'New Mission' to start!", checkFn: () => false, params: {} });
   const [isShuffling, setIsShuffling] = useState(false);
 
   // Helper: Generate a fresh 54-card deck
   const getFreshDeck = () => {
-    let deck = [];
+    let deck: CardType[] = [];
     SUITS.forEach(suit => {
       RANKS.forEach(rank => {
         deck.push({
@@ -127,7 +150,7 @@ function App() {
   };
 
   // Helper: Fisher-Yates Shuffle Algorithm
-  const shuffleDeck = (deck) => {
+  const shuffleDeck = (deck: CardType[]) => {
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -136,7 +159,7 @@ function App() {
   };
 
   // Function to pick a random element from an array, handling nested arrays for params
-  const getRandomParamValue = (param) => {
+  const getRandomParamValue = (param: any) => {
     if (Array.isArray(param)) {
       // If it's an array, pick one random element from it
       return param[Math.floor(Math.random() * param.length)];
@@ -152,7 +175,7 @@ function App() {
     setTimeout(() => {
       const templateItem = TASK_TEMPLATES[Math.floor(Math.random() * TASK_TEMPLATES.length)];
       let taskText = templateItem.template;
-      let taskParams = {};
+      let taskParams: any = {};
 
       // Process placeholders if they exist
       if (templateItem.params) {
@@ -166,25 +189,25 @@ function App() {
       }
       
       // Handle special cases for display (e.g., join arrays for display)
-      if (taskText.includes("Royal Pair")) {
+      if (taskText.includes("Royal Pair") && taskParams.royalRanks) {
           taskText = taskText.replace('{{royalRanks}}', taskParams.royalRanks.join(', '));
       }
-      if (taskText.includes("Flush")) {
+      if (taskText.includes("Flush") && taskParams.count) {
           taskText = taskText.replace('{{count}}', taskParams.count);
       }
-      if (taskText.includes("add up to")) {
+      if (taskText.includes("add up to") && taskParams.sum) {
           taskText = taskText.replace('{{sum}}', taskParams.sum);
       }
-      if (taskText.includes("Odd numbered cards")) {
+      if (taskText.includes("Odd numbered cards") && taskParams.count) {
            taskText = taskText.replace('{{count}}', taskParams.count);
       }
-      if (taskText.includes("pair of")) {
+      if (taskText.includes("pair of") && taskParams.rank) {
           taskText = taskText.replace('{{rank}}', taskParams.rank);
       }
-      if (taskText.includes("Black Jack")) {
+      if (taskText.includes("Black Jack") && taskParams.blackSuits) {
           taskText = taskText.replace('{{blackSuits}}', taskParams.blackSuits.join(', '));
       }
-      if (taskText.includes("Heart cards")) {
+      if (taskText.includes("Heart cards") && taskParams.count) {
            taskText = taskText.replace('{{count}}', taskParams.count);
       }
 
@@ -256,7 +279,7 @@ function App() {
           }}
           disabled={isShuffling}
         >
-          {isShuffling ? 'Shuffling...' : `Deal ${Math.max(2, Math.min(5, Math.floor(Math.random() * 4) + 2))} Cards`}
+          {isShuffling ? 'Shuffling...' : `Deal Cards`}
         </button>
         {isTaskCompleted && hand.length > 0 && (
             <div style={styles.completionMessage}>✅ Mission Accomplished!</div>
@@ -267,7 +290,7 @@ function App() {
 }
 
 // Sub-component for a single card
-const Card = ({ card, index }) => {
+const Card = ({ card, index }: { card: CardType, index: number }) => {
   return (
     <div 
       style={{
@@ -284,7 +307,7 @@ const Card = ({ card, index }) => {
 };
 
 // --- CSS Styles (JS Objects) ---
-const styles = {
+const styles: { [key: string]: CSSProperties } = {
   table: {
     minHeight: '100vh',
     backgroundColor: '#0f5132', // Classic Poker Table Green
